@@ -225,7 +225,6 @@ async def system_health_check():
             }
         )
 
-
 @app.get("/api/v1/info",
          summary="API信息",
          description="获取API的详细信息和配置")
@@ -233,9 +232,9 @@ async def api_info():
     """API信息"""
     return {
         "api": {
-            "name": "RAG系统",
-            "version": "2.0.0",
-            "description": "提供文档索引、搜索和智能问答服务"
+            "name": "双模式RAG系统",
+            "version": "2.1.0",
+            "description": "提供文档索引、搜索、智能问答和事件提取服务"
         },
         "endpoints": {
             "documents": "/api/v1/documents",
@@ -253,25 +252,45 @@ async def api_info():
             "query_rewriting": True,
             "query_decomposition": True,
             "reranking": True,
-            "citation": True
+            "citation": True,
+            "event_extraction": True,
+            "chat_file_detection": True,
+            "intelligent_retrieval": True,
+            "dual_mode_indexing": True,
+            "event_search": True,
+            "multi_strategy_retrieval": True
         },
         "supported_file_types": [".pdf", ".docx", ".doc", ".txt", ".md"],
+        "file_type_detection": {
+            "chat_files": {
+                "patterns": ["*_聊天.*", "*聊天记录*", "*对话*"],
+                "event_types": [
+                    "meeting_plan", "meal_plan", "travel_plan", "shopping_plan",
+                    "entertainment_plan", "family_plan", "work_task", "social_event", "other_plan"
+                ]
+            },
+            "document_files": {
+                "indexing_method": "proposition_extraction",
+                "semantic_levels": ["chunks", "propositions"]
+            }
+        },
         "technology_stack": {
             "web_framework": "FastAPI",
             "vector_store": "ElasticSearch",
             "embedding_model": "BGE (BAAI/bge-small-zh)",
             "llm": "通义千问 (Qwen)",
-            "retrieval": "Hybrid (Semantic + Keyword)"
+            "retrieval": "Multi-Strategy (Intelligent/Hybrid/Semantic/Keyword)",
+            "event_extraction": "LLM-based"
         },
         "configuration": {
             "max_file_size": "unlimited",
             "max_query_length": "unlimited",
             "session_timeout": "24 hours",
             "max_history_turns": 5,
-            "default_top_k": 5
+            "default_top_k": 5,
+            "supported_languages": ["中文", "English"]
         }
     }
-
 
 # 如果直接运行此文件，启动服务器
 if __name__ == "__main__":

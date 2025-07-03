@@ -10,11 +10,11 @@ from typing import Optional
 @dataclass
 class OpenAIConfig:
     """OpenAI LLM配置"""
-    api_key: str = os.getenv("OPENAI_API_KEY", "your-openai-api-key")
+    api_key: str = os.getenv("OPENAI_API_KEY", "sk-2a80fc1e74374e3eb178855a1e41f2ef")
     api_base: str = os.getenv("OPENAI_API_BASE", "https://dashscope.aliyuncs.com/compatible-mode/v1")
     model: str = os.getenv("DEFAULT_CHAT_MODEL", "qwen-plus")
     max_tokens: int = 8192
-    temperature: float = 0.7
+    temperature: float = 0.5
 
     def validate(self) -> bool:
         """验证配置有效性"""

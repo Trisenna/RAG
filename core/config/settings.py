@@ -41,7 +41,7 @@ class Settings:
     CHUNK_OVERLAP = 200
 
     # API密钥配置
-    TONGYI_API_KEY = os.getenv("TONGYI_API_KEY", "your-tongyi-api-key")
+    TONGYI_API_KEY = os.getenv("TONGYI_API_KEY", "sk-2a80fc1e74374e3eb178855a1e41f2ef")
 
     # 日志配置
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

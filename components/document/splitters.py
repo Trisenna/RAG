@@ -1,8 +1,8 @@
 """
 文档分割器实现
-支持传统分割和LLM增强的命题提取分割
+支持传统分割、LLM增强的命题提取分割和事件驱动分割
 """
-
+import os
 import re
 import time
 import uuid
@@ -15,18 +15,19 @@ from langchain_community.chat_models import ChatTongyi
 
 from core.config.settings import settings
 from core.exceptions.errors import DocumentProcessingException
+from components.document.event_extractor import ChatEventExtractor
 
 logger = logging.getLogger(__name__)
 
 
 class DocumentSplitter:
-    """改进版文档分割器，支持传统分割和LLM增强的命题提取"""
+    """改进版文档分割器，支持传统分割、命题提取分割和事件驱动分割"""
 
     def __init__(self,
                  chunk_size: int = None,
                  chunk_overlap: int = None,
                  use_proposition_extraction: bool = True,
-                 max_llm_chunk_size: int = 2000,
+                 max_llm_chunk_size: int = 5000,
                  max_retries: int = 2):
         """
         初始化文档分割器
@@ -75,6 +76,9 @@ class DocumentSplitter:
                 logger.warning(f"LLM初始化失败，将回退到传统分割: {e}")
                 self.use_proposition_extraction = False
 
+        # 初始化事件提取器
+        self.event_extractor = ChatEventExtractor(max_retries=max_retries)
+
     async def split_documents_async(self, documents: List[Document]) -> List[Document]:
         """
         异步分割文档并保留上下文信息
@@ -96,7 +100,11 @@ class DocumentSplitter:
             tasks = []
 
             for doc in documents:
-                tasks.append(self._process_document_async(doc))
+                # 根据文档类型选择处理方式
+                if doc.metadata and doc.metadata.get("is_chat_file", False):
+                    tasks.append(self._process_chat_document_async(doc))
+                else:
+                    tasks.append(self._process_document_async(doc))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -132,18 +140,131 @@ class DocumentSplitter:
 
         result_docs = []
         for doc in documents:
-            doc_result = self._process_document_sync(doc)
+            if doc.metadata and doc.metadata.get("is_chat_file", False):
+                doc_result = self._process_chat_document_sync(doc)
+            else:
+                doc_result = self._process_document_sync(doc)
             result_docs.extend(doc_result)
 
         logger.info(f"同步文档分割完成，原始: {len(documents)}, 分割后: {len(result_docs)}")
         return result_docs
 
+    async def _process_chat_document_async(self, doc: Document) -> List[Document]:
+        """异步处理聊天文档 - 修复版本"""
+        try:
+            # 修复document_id和base_name获取逻辑
+            document_id = doc.metadata.get("document_id", "")
+            base_name = doc.metadata.get("base_name", "")
+            filename = doc.metadata.get("filename", "")
+
+            # 生成可靠的基础ID
+            if base_name:
+                doc_id = base_name
+            elif document_id:
+                doc_id = os.path.splitext(os.path.basename(document_id))[0]
+            elif filename:
+                doc_id = os.path.splitext(filename)[0]
+            else:
+                doc_id = f"chat_{uuid.uuid4().hex[:8]}"
+
+            # 获取参与者信息
+            participants = doc.metadata.get("chat_participants", [])
+
+            logger.info(f"开始处理聊天文档: {doc_id}, 参与者: {participants}")
+
+            # 提取事件
+            events = await self.event_extractor.extract_events_async(
+                doc.page_content,
+                participants
+            )
+
+            if not events:
+                logger.warning(f"未从聊天文档中提取到事件: {doc_id}")
+                # 如果没有提取到事件，回退到传统分割
+                return await self._process_document_async(doc)
+
+            # 将事件转换为文档 - 确保传递正确的document_id
+            event_docs = self.event_extractor.create_event_documents(events, doc)
+
+            # 同时创建原始聊天内容的块（作为备份）
+            original_chunks = await self._process_document_async(doc)
+
+            # 为原始块添加标识 - 确保布尔值正确设置
+            for chunk in original_chunks:
+                chunk.metadata["is_backup_chunk"] = True
+                chunk.metadata["has_events"] = True
+                chunk.metadata["is_chat_file"] = True
+
+                logger.debug(f"设置备份块元数据 {chunk.metadata.get('chunk_id')}:")
+                logger.debug(f"  is_backup_chunk: {chunk.metadata['is_backup_chunk']}")
+                logger.debug(f"  is_chat_file: {chunk.metadata['is_chat_file']}")
+
+            logger.info(f"聊天文档处理完成: {doc_id}, 事件数: {len(event_docs)}, 备份块数: {len(original_chunks)}")
+
+            # 返回事件文档和原始块
+            return event_docs + original_chunks
+
+        except Exception as e:
+            logger.error(f"处理聊天文档失败: {e}", exc_info=True)
+            # 回退到普通文档处理
+            return await self._process_document_async(doc)
+    def _process_chat_document_sync(self, doc: Document) -> List[Document]:
+        """同步处理聊天文档"""
+        try:
+            source_id = doc.metadata.get("source", "")
+            filename = doc.metadata.get("filename", "")
+            doc_id = source_id or filename or f"chat_{uuid.uuid4().hex[:8]}"
+
+            # 获取参与者信息
+            participants = doc.metadata.get("chat_participants", [])
+
+            # 提取事件
+            events = self.event_extractor.extract_events_sync(
+                doc.page_content,
+                participants
+            )
+
+            if not events:
+                logger.warning(f"未从聊天文档中提取到事件: {doc_id}")
+                return self._process_document_sync(doc)
+
+            # 将事件转换为文档
+            event_docs = self.event_extractor.create_event_documents(events, doc)
+
+            # 同时创建原始聊天内容的块
+            original_chunks = self._process_document_sync(doc)
+
+            # 为原始块添加标识
+            for chunk in original_chunks:
+                chunk.metadata["is_backup_chunk"] = True
+                chunk.metadata["has_events"] = len(events) > 0
+
+            return event_docs + original_chunks
+
+        except Exception as e:
+            logger.error(f"同步处理聊天文档失败: {e}")
+            return self._process_document_sync(doc)
+
     async def _process_document_async(self, doc: Document) -> List[Document]:
-        """异步处理单个文档"""
+        """异步处理普通文档 - 修复版本"""
         doc_result = []
-        source_id = doc.metadata.get("source", "")
+
+        # 修复document_id和base_name获取逻辑
+        document_id = doc.metadata.get("document_id", "")
+        base_name = doc.metadata.get("base_name", "")
         filename = doc.metadata.get("filename", "")
-        doc_id = source_id or filename or f"doc_{uuid.uuid4().hex[:8]}"
+
+        # 生成可靠的基础ID
+        if base_name:
+            doc_id = base_name
+        elif document_id:
+            doc_id = os.path.splitext(os.path.basename(document_id))[0]
+        elif filename:
+            doc_id = os.path.splitext(filename)[0]
+        else:
+            doc_id = f"doc_{uuid.uuid4().hex[:8]}"
+
+        logger.debug(f"处理文档，doc_id: {doc_id}, document_id: {document_id}, base_name: {base_name}")
 
         try:
             # 先使用传统方法分割获取原始chunks
@@ -158,20 +279,30 @@ class DocumentSplitter:
                 prev_context = chunks[i - 1][-150:] if i > 0 else ""
                 next_context = chunks[i + 1][:150] if i < len(chunks) - 1 else ""
 
-                # 构建增强的元数据
+                # 构建增强的元数据 - 确保所有关键字段都有值
                 enhanced_metadata = {
-                    **doc.metadata,
+                    **doc.metadata,  # 保持原有元数据
                     "chunk_id": chunk_id,
                     "chunk_index": i,
                     "total_chunks": len(chunks),
-                    "prev_chunk_id": f"{doc_id}_node_{i - 1}" if i > 0 else None,
-                    "next_chunk_id": f"{doc_id}_node_{i + 1}" if i < len(chunks) - 1 else None,
+                    "prev_chunk_id": f"{doc_id}_node_{i - 1}" if i > 0 else "",
+                    "next_chunk_id": f"{doc_id}_node_{i + 1}" if i < len(chunks) - 1 else "",
                     "prev_context_preview": prev_context,
                     "next_context_preview": next_context,
-                    "document_id": doc_id,
+                    "document_id": document_id,  # 确保document_id正确
+
+                    # 明确设置布尔字段 - 使用Python布尔类型
                     "is_proposition": False,
+                    "is_event": False,
+                    "is_backup_chunk": False,
                     "semantic_level": 0,
                 }
+
+                logger.debug(f"创建原始节点 {chunk_id}:")
+                logger.debug(f"  chunk_id: {chunk_id}")
+                logger.debug(f"  document_id: {enhanced_metadata['document_id']}")
+                logger.debug(
+                    f"  is_proposition: {enhanced_metadata['is_proposition']} (type: {type(enhanced_metadata['is_proposition'])})")
 
                 chunk_doc = Document(
                     page_content=chunk,
@@ -180,8 +311,11 @@ class DocumentSplitter:
                 original_nodes.append(chunk_doc)
                 doc_result.append(chunk_doc)
 
-            # 如果启用命题提取且LLM可用
-            if self.use_proposition_extraction and self.llm:
+            # 如果启用命题提取且LLM可用且不是聊天文件
+            if (self.use_proposition_extraction and
+                    self.llm and
+                    not doc.metadata.get("is_chat_file", False)):
+
                 for i, node in enumerate(original_nodes):
                     propositions = await self._extract_propositions_async(node.page_content)
 
@@ -193,15 +327,24 @@ class DocumentSplitter:
                         prop_id = f"{doc_id}_node_{i}_prop_{j}"
 
                         prop_metadata = {
-                            **doc.metadata,
+                            **doc.metadata,  # 保持原有元数据
                             "chunk_id": prop_id,
                             "chunk_index": j,
                             "total_chunks": len(propositions),
                             "parent_node_id": node.metadata["chunk_id"],
-                            "document_id": doc_id,
+                            "document_id": document_id,  # 确保document_id正确
+
+                            # 明确设置布尔字段
                             "is_proposition": True,
+                            "is_event": False,
+                            "is_backup_chunk": False,
                             "semantic_level": 1,
                         }
+
+                        logger.debug(f"创建命题文档 {prop_id}:")
+                        logger.debug(
+                            f"  is_proposition: {prop_metadata['is_proposition']} (type: {type(prop_metadata['is_proposition'])})")
+                        logger.debug(f"  document_id: {prop_metadata['document_id']}")
 
                         prop_doc = Document(
                             page_content=prop,
@@ -209,13 +352,13 @@ class DocumentSplitter:
                         )
                         doc_result.append(prop_doc)
 
+            logger.info(f"文档 {doc_id} 处理完成，生成 {len(doc_result)} 个块")
             return doc_result
 
         except Exception as e:
-            logger.error(f"异步处理文档失败: {e}")
+            logger.error(f"异步处理文档失败: {e}", exc_info=True)
             # 回退到同步处理
             return self._process_document_sync(doc)
-
     def _process_document_sync(self, doc: Document) -> List[Document]:
         """同步处理单个文档（回退方法）"""
         doc_result = []
@@ -242,6 +385,7 @@ class DocumentSplitter:
                 "next_context_preview": next_context,
                 "document_id": doc_id,
                 "is_proposition": False,
+                "is_event": False,
                 "semantic_level": 0,
             }
 

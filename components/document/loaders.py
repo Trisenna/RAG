@@ -1,6 +1,6 @@
 """
 文档加载器实现
-根据文件类型自动选择合适的加载器
+根据文件类型自动选择合适的加载器，支持聊天文件识别
 """
 
 import os
@@ -14,6 +14,7 @@ from langchain_community.document_loaders import (
 )
 
 from core.exceptions.errors import DocumentProcessingException
+from components.document.event_extractor import ChatEventExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,7 @@ class DocumentLoader:
 
     def __init__(self):
         self.factory = DocumentLoaderFactory()
+        self.event_extractor = ChatEventExtractor()
 
     def load_file(self, file_path: str) -> List[Document]:
         """
@@ -125,7 +127,26 @@ class DocumentLoader:
                 )
 
             documents = loader.load()
-            logger.info(f"成功加载文件: {file_path}，文档数量: {len(documents)}")
+
+            # 为文档添加文件类型信息
+            filename = os.path.basename(file_path)
+            is_chat = self.event_extractor.is_chat_file(filename)
+
+            for doc in documents:
+                if doc.metadata is None:
+                    doc.metadata = {}
+
+                # 添加文件类型标识
+                doc.metadata["file_type"] = "chat" if is_chat else "document"
+                doc.metadata["is_chat_file"] = is_chat
+
+                # 如果是聊天文件，添加参与者信息
+                if is_chat:
+                    participants = self.event_extractor.extract_participants_from_filename(filename)
+                    doc.metadata["chat_participants"] = participants
+                    logger.info(f"识别为聊天文件: {filename}, 参与者: {participants}")
+
+            logger.info(f"成功加载文件: {file_path}，文档数量: {len(documents)}, 类型: {'聊天' if is_chat else '文档'}")
             return documents
 
         except DocumentProcessingException:
@@ -157,6 +178,8 @@ class DocumentLoader:
         all_documents = []
         loaded_files = 0
         failed_files = 0
+        chat_files = 0
+        doc_files = 0
 
         for root, _, files in os.walk(directory_path):
             for file in files:
@@ -170,13 +193,34 @@ class DocumentLoader:
                     documents = self.load_file(file_path)
                     all_documents.extend(documents)
                     loaded_files += 1
+
+                    # 统计文件类型
+                    if documents and documents[0].metadata.get("is_chat_file", False):
+                        chat_files += 1
+                    else:
+                        doc_files += 1
+
                 except DocumentProcessingException as e:
                     logger.error(f"加载文件失败: {file_path}, 错误: {e.message}")
                     failed_files += 1
 
-        logger.info(f"目录加载完成: {directory_path}, 成功: {loaded_files}, 失败: {failed_files}")
+        logger.info(f"目录加载完成: {directory_path}, 成功: {loaded_files}, 失败: {failed_files}, "
+                   f"聊天文件: {chat_files}, 文档文件: {doc_files}")
         return all_documents
 
     def get_supported_extensions(self) -> List[str]:
         """获取支持的文件扩展名"""
         return self.factory.get_supported_extensions()
+
+    def is_chat_file(self, file_path: str) -> bool:
+        """
+        判断文件是否为聊天文件
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            是否为聊天文件
+        """
+        filename = os.path.basename(file_path)
+        return self.event_extractor.is_chat_file(filename)

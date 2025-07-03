@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG 系统</title>
+    <title>双模式RAG系统</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <style>
         .chat-message {
@@ -30,21 +30,38 @@
             60% { content: ' ...'; }
             80%, 100% { content: ' '; }
         }
+        .event-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .event-meeting { background-color: #dbeafe; color: #1e40af; }
+        .event-meal { background-color: #fef3c7; color: #92400e; }
+        .event-travel { background-color: #d1fae5; color: #065f46; }
+        .event-shopping { background-color: #ede9fe; color: #6b21a8; }
+        .event-work { background-color: #fee2e2; color: #991b1b; }
+        .event-social { background-color: #fce7f3; color: #a21caf; }
+        .event-other { background-color: #f3f4f6; color: #374151; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold text-center mb-8">RAG 知识库系统</h1>
-        
+        <h1 class="text-3xl font-bold text-center mb-2">双模式RAG系统</h1>
+        <p class="text-center text-gray-600 mb-8">支持文档知识检索和聊天事件提取的智能问答系统</p>
+
         <!-- 主体部分 - 使用标签页切换不同功能 -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <div class="flex mb-4 border-b">
-                <button id="tab-documents" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600">文档管理</button>
-                <button id="tab-search" class="tab-btn px-4 py-2 font-medium text-gray-500">文档检索</button>
-                <button id="tab-rag" class="tab-btn px-4 py-2 font-medium text-gray-500">RAG 查询</button>
-                <button id="tab-contextual" class="tab-btn px-4 py-2 font-medium text-gray-500">上下文对话</button>
+            <div class="flex mb-4 border-b overflow-x-auto">
+                <button id="tab-documents" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap">文档管理</button>
+                <button id="tab-search" class="tab-btn px-4 py-2 font-medium text-gray-500 whitespace-nowrap">文档检索</button>
+                <button id="tab-events" class="tab-btn px-4 py-2 font-medium text-gray-500 whitespace-nowrap">事件搜索</button>
+                <button id="tab-rag" class="tab-btn px-4 py-2 font-medium text-gray-500 whitespace-nowrap">RAG查询</button>
+                <button id="tab-contextual" class="tab-btn px-4 py-2 font-medium text-gray-500 whitespace-nowrap">上下文对话</button>
+                <button id="tab-statistics" class="tab-btn px-4 py-2 font-medium text-gray-500 whitespace-nowrap">系统统计</button>
             </div>
-            
+
             <!-- 文档管理标签页内容 -->
             <div id="content-documents" class="tab-content">
                 <div class="mb-6">
@@ -59,6 +76,9 @@
                                     <p class="mt-1 text-sm text-gray-600">
                                         点击选择文件或拖放文件到此处
                                     </p>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        支持聊天文件（*_聊天.*）和普通文档
+                                    </p>
                                 </label>
                                 <input id="file-upload" type="file" class="hidden" />
                             </div>
@@ -69,7 +89,7 @@
                     </div>
                     <div id="upload-result" class="mt-2 text-sm"></div>
                 </div>
-                
+
                 <div class="mb-6">
                     <h2 class="text-xl font-semibold mb-4">索引管理</h2>
                     <div class="flex space-x-4">
@@ -79,19 +99,28 @@
                         <button id="btn-delete-indexes" class="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded">
                             删除所有索引
                         </button>
+                        <button id="btn-recreate-indexes" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded">
+                            重建索引
+                        </button>
                     </div>
                     <div id="index-result" class="mt-2 text-sm"></div>
                 </div>
             </div>
-            
+
             <!-- 文档检索标签页内容 -->
             <div id="content-search" class="tab-content hidden">
                 <div class="mb-6">
                     <h2 class="text-xl font-semibold mb-4">文档检索</h2>
-                    <div class="flex items-center">
-                        <input id="search-input" type="text" placeholder="输入检索关键词..." 
-                               class="flex-1 border border-gray-300 rounded-lg px-4 py-2 mr-4" />
-                        <select id="search-topk" class="border border-gray-300 rounded-lg px-4 py-2 mr-4">
+                    <div class="flex items-center flex-wrap gap-4">
+                        <input id="search-input" type="text" placeholder="输入检索关键词..."
+                               class="flex-1 min-w-64 border border-gray-300 rounded-lg px-4 py-2" />
+                        <select id="search-type" class="border border-gray-300 rounded-lg px-4 py-2">
+                            <option value="intelligent" selected>智能检索</option>
+                            <option value="hybrid">混合检索</option>
+                            <option value="semantic">语义检索</option>
+                            <option value="keyword">关键词检索</option>
+                        </select>
+                        <select id="search-topk" class="border border-gray-300 rounded-lg px-4 py-2">
                             <option value="3">Top 3</option>
                             <option value="5" selected>Top 5</option>
                             <option value="10">Top 10</option>
@@ -101,12 +130,51 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <div id="search-results" class="mt-6">
                     <!-- 搜索结果将在此动态显示 -->
                 </div>
             </div>
-            
+
+            <!-- 事件搜索标签页内容 -->
+            <div id="content-events" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold mb-4">事件搜索</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <input id="event-query" type="text" placeholder="搜索事件内容..."
+                               class="border border-gray-300 rounded-lg px-4 py-2" />
+                        <select id="event-type" class="border border-gray-300 rounded-lg px-4 py-2">
+                            <option value="">所有事件类型</option>
+                            <option value="meeting_plan">会议计划</option>
+                            <option value="meal_plan">用餐计划</option>
+                            <option value="travel_plan">出行计划</option>
+                            <option value="shopping_plan">购物计划</option>
+                            <option value="entertainment_plan">娱乐计划</option>
+                            <option value="family_plan">家庭计划</option>
+                            <option value="work_task">工作任务</option>
+                            <option value="social_event">社交活动</option>
+                            <option value="other_plan">其他计划</option>
+                        </select>
+                        <input id="event-participants" type="text" placeholder="参与者（用逗号分隔）..."
+                               class="border border-gray-300 rounded-lg px-4 py-2" />
+                        <select id="event-topk" class="border border-gray-300 rounded-lg px-4 py-2">
+                            <option value="5">Top 5</option>
+                            <option value="10" selected>Top 10</option>
+                            <option value="20">Top 20</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-center">
+                        <button id="btn-search-events" class="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded">
+                            搜索事件
+                        </button>
+                    </div>
+                </div>
+
+                <div id="events-results" class="mt-6">
+                    <!-- 事件搜索结果将在此动态显示 -->
+                </div>
+            </div>
+
             <!-- RAG 查询标签页内容 -->
             <div id="content-rag" class="tab-content hidden">
                 <div class="mb-6">
@@ -127,7 +195,7 @@
                             </label>
                         </div>
                         <div class="flex items-center">
-                            <input id="rag-query" type="text" placeholder="输入你的问题..." 
+                            <input id="rag-query" type="text" placeholder="输入你的问题..."
                                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2 mr-4" />
                             <select id="rag-topk" class="border border-gray-300 rounded-lg px-4 py-2 mr-4">
                                 <option value="3">Top 3</option>
@@ -140,12 +208,12 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="rag-result" class="mt-6">
                     <!-- RAG 查询结果将在此动态显示 -->
                 </div>
             </div>
-            
+
             <!-- 上下文对话标签页内容 -->
             <div id="content-contextual" class="tab-content hidden">
                 <div class="mb-4 flex space-x-4">
@@ -156,7 +224,7 @@
                         清除对话历史
                     </button>
                 </div>
-                
+
                 <div class="mb-4">
                     <div class="flex space-x-4 mb-4">
                         <label class="flex items-center">
@@ -173,27 +241,41 @@
                         </label>
                     </div>
                 </div>
-                
+
                 <!-- 对话消息区域 -->
                 <div id="chat-container" class="mb-4 h-96 border border-gray-200 rounded-lg p-4 overflow-y-auto">
                     <div id="chat-messages" class="flex flex-col">
                         <div class="chat-message system-message">
-                            <p>您好！我是基于知识库的智能助手，请问有什么可以帮助您的？</p>
+                            <p>您好！我是基于双模式知识库的智能助手，可以回答文档问题和查找聊天事件，请问有什么可以帮助您的？</p>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- 对话输入区域 -->
                 <div class="flex items-center">
-                    <input id="chat-input" type="text" placeholder="输入您的问题..." 
+                    <input id="chat-input" type="text" placeholder="输入您的问题..."
                            class="flex-1 border border-gray-300 rounded-lg px-4 py-2 mr-4" />
                     <button id="btn-send-message" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded">
                         发送
                     </button>
                 </div>
             </div>
+
+            <!-- 系统统计标签页内容 -->
+            <div id="content-statistics" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold mb-4">系统统计信息</h2>
+                    <button id="btn-refresh-stats" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded mb-4">
+                        刷新统计
+                    </button>
+                </div>
+
+                <div id="statistics-content" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- 统计信息将在此动态显示 -->
+                </div>
+            </div>
         </div>
-        
+
         <!-- 系统状态 -->
         <div class="bg-white rounded-lg shadow p-4 text-center">
             <div class="flex justify-between items-center">
@@ -206,6 +288,9 @@
                     <span>会话ID: </span>
                     <span id="session-id">未创建</span>
                 </div>
+                <div>
+                    <span>双模式RAG v2.1.0</span>
+                </div>
             </div>
         </div>
     </div>
@@ -213,30 +298,32 @@
     <script>
         // 配置信息
         const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
-        
+
         // 状态变量
         let currentSessionId = null;
-        
+
         // 页面加载完成后执行
         document.addEventListener('DOMContentLoaded', function() {
             // 初始化标签页切换
             initTabs();
-            
+
             // 初始化各功能模块
             initDocumentManagement();
             initSearch();
+            initEventSearch();
             initRAGQuery();
             initContextualChat();
-            
+            initStatistics();
+
             // 检查系统状态
             checkSystemStatus();
         });
-        
+
         // 初始化标签页切换功能
         function initTabs() {
             const tabButtons = document.querySelectorAll('.tab-btn');
             const tabContents = document.querySelectorAll('.tab-content');
-            
+
             tabButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     // 移除所有标签按钮的活动状态
@@ -244,32 +331,33 @@
                         btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
                         btn.classList.add('text-gray-500');
                     });
-                    
+
                     // 添加当前标签按钮的活动状态
                     button.classList.remove('text-gray-500');
                     button.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
-                    
+
                     // 隐藏所有内容区域
                     tabContents.forEach(content => {
                         content.classList.add('hidden');
                     });
-                    
+
                     // 显示当前标签对应的内容区域
                     const contentId = button.id.replace('tab-', 'content-');
                     document.getElementById(contentId).classList.remove('hidden');
                 });
             });
         }
-        
+
         // 初始化文档管理功能
         function initDocumentManagement() {
             const fileUploadInput = document.getElementById('file-upload');
             const uploadButton = document.getElementById('btn-upload');
             const indexAllButton = document.getElementById('btn-index-all');
             const deleteIndexesButton = document.getElementById('btn-delete-indexes');
+            const recreateIndexesButton = document.getElementById('btn-recreate-indexes');
             const uploadResultDiv = document.getElementById('upload-result');
             const indexResultDiv = document.getElementById('index-result');
-            
+
             // 文件上传事件
             uploadButton.addEventListener('click', async () => {
                 const file = fileUploadInput.files[0];
@@ -277,22 +365,29 @@
                     uploadResultDiv.innerHTML = '<p class="text-red-500">请先选择文件</p>';
                     return;
                 }
-                
+
                 uploadResultDiv.innerHTML = '<p class="text-blue-500">正在上传文档...</p>';
-                
+
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/documents/upload`, {
                         method: 'POST',
                         body: formData
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok) {
-                        uploadResultDiv.innerHTML = `<p class="text-green-500">文档 "${result.filename}" 上传成功!</p>`;
+                        const fileType = result.is_chat_file ? '聊天文件' : '普通文档';
+                        const typeIcon = result.is_chat_file ? '💬' : '📄';
+                        uploadResultDiv.innerHTML = `
+                            <p class="text-green-500">
+                                ${typeIcon} 文档 "${result.filename}" 上传成功！
+                                <span class="text-sm text-gray-600">(识别为: ${fileType})</span>
+                            </p>
+                        `;
                         fileUploadInput.value = '';
                     } else {
                         uploadResultDiv.innerHTML = `<p class="text-red-500">上传失败: ${result.detail || result.message || '未知错误'}</p>`;
@@ -301,24 +396,24 @@
                     uploadResultDiv.innerHTML = `<p class="text-red-500">上传出错: ${error.message}</p>`;
                 }
             });
-            
+
             // 索引所有文档事件
             indexAllButton.addEventListener('click', async () => {
                 indexResultDiv.innerHTML = '<p class="text-blue-500">正在索引所有文档...</p>';
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/documents/index`, {
                         method: 'POST'
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok) {
                         const indexingResult = result.indexing_result || {};
                         const processedCount = indexingResult.processed_files || indexingResult.total_files || 0;
                         const successCount = indexingResult.successful_files || indexingResult.success_count || 0;
                         const failedCount = indexingResult.failed_files || indexingResult.failed_count || 0;
-                        
+
                         indexResultDiv.innerHTML = `<p class="text-green-500">索引完成! 处理文档: ${processedCount}个，成功: ${successCount}个，失败: ${failedCount}个</p>`;
                     } else {
                         indexResultDiv.innerHTML = `<p class="text-red-500">索引失败: ${result.detail || result.message || '未知错误'}</p>`;
@@ -327,22 +422,22 @@
                     indexResultDiv.innerHTML = `<p class="text-red-500">索引出错: ${error.message}</p>`;
                 }
             });
-            
+
             // 删除所有索引事件
             deleteIndexesButton.addEventListener('click', async () => {
                 if (!confirm('确定要删除所有索引吗？此操作不可恢复!')) {
                     return;
                 }
-                
+
                 indexResultDiv.innerHTML = '<p class="text-blue-500">正在删除所有索引...</p>';
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/documents/indexes`, {
                         method: 'DELETE'
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok) {
                         indexResultDiv.innerHTML = `<p class="text-green-500">所有索引已删除!</p>`;
                     } else {
@@ -352,50 +447,90 @@
                     indexResultDiv.innerHTML = `<p class="text-red-500">删除出错: ${error.message}</p>`;
                 }
             });
+
+            // 重建索引事件
+            recreateIndexesButton.addEventListener('click', async () => {
+                if (!confirm('确定要重建所有索引吗？这将删除现有索引并重新创建。')) {
+                    return;
+                }
+
+                indexResultDiv.innerHTML = '<p class="text-blue-500">正在重建索引...</p>';
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/documents/indexes/recreate`, {
+                        method: 'POST'
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        indexResultDiv.innerHTML = `<p class="text-green-500">索引重建成功!</p>`;
+                    } else {
+                        indexResultDiv.innerHTML = `<p class="text-red-500">重建失败: ${result.detail || result.message || '未知错误'}</p>`;
+                    }
+                } catch (error) {
+                    indexResultDiv.innerHTML = `<p class="text-red-500">重建出错: ${error.message}</p>`;
+                }
+            });
         }
-        
+
         // 初始化文档检索功能
         function initSearch() {
             const searchInput = document.getElementById('search-input');
+            const searchType = document.getElementById('search-type');
             const searchTopk = document.getElementById('search-topk');
             const searchButton = document.getElementById('btn-search');
             const searchResultsDiv = document.getElementById('search-results');
-            
+
             searchButton.addEventListener('click', async () => {
                 const query = searchInput.value.trim();
                 if (!query) {
                     searchResultsDiv.innerHTML = '<p class="text-red-500">请输入检索关键词</p>';
                     return;
                 }
-                
+
                 searchResultsDiv.innerHTML = '<p class="text-blue-500">正在检索相关文档...</p>';
-                
+
                 try {
-                    const response = await fetch(`${API_BASE_URL}/documents/search?query=${encodeURIComponent(query)}&top_k=${searchTopk.value}`);
+                    const response = await fetch(`${API_BASE_URL}/documents/search?query=${encodeURIComponent(query)}&top_k=${searchTopk.value}&search_type=${searchType.value}`);
                     const result = await response.json();
-                    
+
                     if (response.ok) {
-                        // 适配新的后端响应结构
                         const searchResult = result.search_result || {};
                         const documents = searchResult.documents || searchResult.results || [];
                         const totalCount = searchResult.total_count || searchResult.count || documents.length;
-                        
+                        const retrievalType = searchResult.retrieval_type || searchType.value;
+
                         if (documents && documents.length > 0) {
-                            let html = `<h3 class="font-semibold mb-2">找到 ${totalCount} 个相关文档:</h3>`;
+                            let html = `
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-semibold">找到 ${totalCount} 个相关文档</h3>
+                                    <span class="text-sm text-gray-500">检索策略: ${getRetrievalTypeName(retrievalType)}</span>
+                                </div>
+                            `;
                             html += '<div class="space-y-4">';
-                            
+
                             documents.forEach((doc, index) => {
-                                // 适配文档结构
                                 const metadata = doc.metadata || {};
                                 const title = metadata.title || metadata.filename || doc.filename || `文档 ${index + 1}`;
                                 const source = metadata.source || doc.source || '未知';
                                 const content = doc.content || doc.page_content || doc.text || '';
                                 const score = doc.score || doc.similarity || 0;
-                                
+                                const isEvent = metadata.is_event || false;
+                                const eventType = metadata.event_type || '';
+
+                                let typeTag = '';
+                                if (isEvent) {
+                                    typeTag = `<span class="event-tag event-${eventType.split('_')[0] || 'other'}">${getEventTypeName(eventType)}</span>`;
+                                }
+
                                 html += `
                                     <div class="border border-gray-200 rounded-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
-                                            <h4 class="font-medium">${escapeHtml(title)}</h4>
+                                            <div class="flex items-center space-x-2">
+                                                <h4 class="font-medium">${escapeHtml(title)}</h4>
+                                                ${typeTag}
+                                            </div>
                                             <span class="text-sm text-gray-500">相关度: ${(score * 100).toFixed(2)}%</span>
                                         </div>
                                         <p class="text-gray-700">${escapeHtml(content.substring(0, 300))}${content.length > 300 ? '...' : ''}</p>
@@ -405,7 +540,7 @@
                                     </div>
                                 `;
                             });
-                            
+
                             html += '</div>';
                             searchResultsDiv.innerHTML = html;
                         } else {
@@ -419,7 +554,93 @@
                 }
             });
         }
-        
+
+        // 初始化事件搜索功能
+        function initEventSearch() {
+            const eventQuery = document.getElementById('event-query');
+            const eventType = document.getElementById('event-type');
+            const eventParticipants = document.getElementById('event-participants');
+            const eventTopk = document.getElementById('event-topk');
+            const searchEventsButton = document.getElementById('btn-search-events');
+            const eventsResultsDiv = document.getElementById('events-results');
+
+            searchEventsButton.addEventListener('click', async () => {
+                const query = eventQuery.value.trim();
+                const type = eventType.value;
+                const participants = eventParticipants.value.trim();
+
+                // 至少需要一个搜索条件
+                if (!query && !type && !participants) {
+                    eventsResultsDiv.innerHTML = '<p class="text-red-500">请至少填写一个搜索条件</p>';
+                    return;
+                }
+
+                eventsResultsDiv.innerHTML = '<p class="text-blue-500">正在搜索事件...</p>';
+
+                try {
+                    let url = `${API_BASE_URL}/documents/search/events?top_k=${eventTopk.value}`;
+                    if (query) url += `&query=${encodeURIComponent(query)}`;
+                    if (type) url += `&event_type=${encodeURIComponent(type)}`;
+                    if (participants) {
+                        const participantList = participants.split(',').map(p => p.trim()).filter(p => p);
+                        participantList.forEach(p => {
+                            url += `&participants=${encodeURIComponent(p)}`;
+                        });
+                    }
+
+                    const response = await fetch(url);
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        const events = result.events || [];
+
+                        if (events.length > 0) {
+                            let html = `
+                                <div class="mb-4">
+                                    <h3 class="font-semibold">找到 ${events.length} 个相关事件</h3>
+                                </div>
+                                <div class="space-y-4">
+                            `;
+
+                            events.forEach((event, index) => {
+                                const eventTypeClass = event.event_type ? `event-${event.event_type.split('_')[0] || 'other'}` : 'event-other';
+                                const eventTypeName = getEventTypeName(event.event_type);
+
+                                html += `
+                                    <div class="border border-gray-200 rounded-lg p-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <div class="flex items-center space-x-2">
+                                                <h4 class="font-medium">${escapeHtml(event.title || '未命名事件')}</h4>
+                                                <span class="event-tag ${eventTypeClass}">${eventTypeName}</span>
+                                            </div>
+                                            <span class="text-sm text-gray-500">相关度: ${(event.score * 100).toFixed(2)}%</span>
+                                        </div>
+                                        <p class="text-gray-700 mb-2">${escapeHtml(event.content || '')}</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-gray-600">
+                                            ${event.time ? `<div><strong>时间:</strong> ${escapeHtml(event.time)}</div>` : ''}
+                                            ${event.location ? `<div><strong>地点:</strong> ${escapeHtml(event.location)}</div>` : ''}
+                                            ${event.participants && event.participants.length > 0 ? `<div><strong>参与者:</strong> ${event.participants.map(p => escapeHtml(p)).join(', ')}</div>` : ''}
+                                            ${event.status ? `<div><strong>状态:</strong> ${escapeHtml(event.status)}</div>` : ''}
+                                        </div>
+                                        ${event.source ? `<div class="mt-2 text-xs text-gray-500">来源: ${escapeHtml(event.source)}</div>` : ''}
+                                    </div>
+                                `;
+                            });
+
+                            html += '</div>';
+                            eventsResultsDiv.innerHTML = html;
+                        } else {
+                            eventsResultsDiv.innerHTML = '<p class="text-yellow-500">未找到相关事件</p>';
+                        }
+                    } else {
+                        eventsResultsDiv.innerHTML = `<p class="text-red-500">搜索失败: ${result.detail || result.message || '未知错误'}</p>`;
+                    }
+                } catch (error) {
+                    eventsResultsDiv.innerHTML = `<p class="text-red-500">搜索出错: ${error.message}</p>`;
+                }
+            });
+        }
+
         // 初始化RAG查询功能
         function initRAGQuery() {
             const ragQuery = document.getElementById('rag-query');
@@ -429,31 +650,31 @@
             const ragCitation = document.getElementById('rag-citation');
             const ragQueryButton = document.getElementById('btn-rag-query');
             const ragResultDiv = document.getElementById('rag-result');
-            
+
             ragQueryButton.addEventListener('click', async () => {
                 const query = ragQuery.value.trim();
                 if (!query) {
                     ragResultDiv.innerHTML = '<p class="text-red-500">请输入查询问题</p>';
                     return;
                 }
-                
+
                 ragResultDiv.innerHTML = '<p class="text-blue-500">正在处理查询...</p>';
-                
+
                 const formData = new FormData();
                 formData.append('query', query);
                 formData.append('top_k', ragTopk.value);
                 formData.append('use_decomposition', ragDecomposition.checked);
                 formData.append('use_reranking', ragReranking.checked);
                 formData.append('use_citation', ragCitation.checked);
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/rag/query`, {
                         method: 'POST',
                         body: formData
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok) {
                         displayRAGResult(result.result, ragResultDiv);
                     } else {
@@ -464,7 +685,7 @@
                 }
             });
         }
-        
+
         // 显示RAG查询结果
         function displayRAGResult(result, container) {
             let html = `
@@ -473,7 +694,7 @@
                     <div class="whitespace-pre-wrap">${escapeHtml(result.answer || result.response || '')}</div>
                 </div>
             `;
-            
+
             // 如果有处理信息，显示处理详情
             if (result.processing_info) {
                 html += `
@@ -481,7 +702,7 @@
                         <h3 class="font-semibold mb-2">处理详情:</h3>
                         <div class="text-sm">
                 `;
-                
+
                 const info = result.processing_info;
                 if (info.original_query) {
                     html += `<p><strong>原始查询:</strong> ${escapeHtml(info.original_query)}</p>`;
@@ -489,7 +710,7 @@
                 if (info.rewritten_query) {
                     html += `<p><strong>重写查询:</strong> ${escapeHtml(info.rewritten_query)}</p>`;
                 }
-                
+
                 if (info.sub_queries && info.sub_queries.length > 0) {
                     html += `<p><strong>查询已分解为 ${info.sub_queries.length} 个子查询:</strong></p>`;
                     html += '<ul class="list-disc list-inside pl-4">';
@@ -498,7 +719,7 @@
                     });
                     html += '</ul>';
                 }
-                
+
                 html += `
                             <p><strong>检索文档数:</strong> ${info.retrieved_count || 0}</p>
                             <p><strong>是否重排序:</strong> ${info.reranked ? '是' : '否'}</p>
@@ -506,7 +727,7 @@
                     </div>
                 `;
             }
-            
+
             // 显示引用来源
             if (result.sources && result.sources.length > 0) {
                 html += `
@@ -514,17 +735,27 @@
                         <h3 class="font-semibold mb-2">引用来源:</h3>
                         <div class="space-y-2">
                 `;
-                
+
                 result.sources.forEach((source, index) => {
                     const filename = source.filename || source.title || `来源 ${index + 1}`;
                     const sourcePath = source.source || '';
                     const score = source.score || source.similarity || 0;
                     const content = source.content || source.page_content || source.text || '';
-                    
+                    const isEvent = source.is_event || false;
+                    const eventType = source.event_type || '';
+
+                    let typeTag = '';
+                    if (isEvent) {
+                        typeTag = `<span class="event-tag event-${eventType.split('_')[0] || 'other'} ml-2">${getEventTypeName(eventType)}</span>`;
+                    }
+
                     html += `
                         <div class="p-2 bg-gray-50 rounded">
                             <div class="flex justify-between items-center mb-1">
-                                <span class="font-medium">${escapeHtml(filename)}</span>
+                                <div class="flex items-center">
+                                    <span class="font-medium">${escapeHtml(filename)}</span>
+                                    ${typeTag}
+                                </div>
                                 <span class="text-xs text-gray-500">相关性分数: ${score.toFixed(3)}</span>
                             </div>
                             ${content ? `<p class="text-sm text-gray-700 mb-2">${escapeHtml(content.substring(0, 200))}${content.length > 200 ? '...' : ''}</p>` : ''}
@@ -532,13 +763,13 @@
                         </div>
                     `;
                 });
-                
+
                 html += `
                         </div>
                     </div>
                 `;
             }
-            
+
             // 显示处理时间
             if (result.processing_time || result.elapsed_time) {
                 const processingTime = result.processing_time || result.elapsed_time;
@@ -548,10 +779,10 @@
                     </div>
                 `;
             }
-            
+
             container.innerHTML = html;
         }
-        
+
         // 初始化上下文对话功能
         function initContextualChat() {
             const chatInput = document.getElementById('chat-input');
@@ -563,24 +794,24 @@
             const ctxDecomposition = document.getElementById('ctx-decomposition');
             const ctxReranking = document.getElementById('ctx-reranking');
             const ctxCitation = document.getElementById('ctx-citation');
-            
+
             // 创建新会话
             newSessionButton.addEventListener('click', async () => {
                 try {
                     const response = await fetch(`${API_BASE_URL}/rag/contextual/session/new`, {
                         method: 'POST'
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok && result.session_id) {
                         currentSessionId = result.session_id;
                         sessionIdSpan.textContent = currentSessionId;
-                        
+
                         // 清空聊天消息
                         chatMessages.innerHTML = `
                             <div class="chat-message system-message">
-                                <p>新会话已创建！我是基于知识库的智能助手，请问有什么可以帮助您的？</p>
+                                <p>新会话已创建！我是基于双模式知识库的智能助手，可以回答文档问题和查找聊天事件，请问有什么可以帮助您的？</p>
                             </div>
                         `;
                     } else {
@@ -590,25 +821,25 @@
                     addSystemMessage(`创建会话出错: ${error.message}`);
                 }
             });
-            
+
             // 清除会话历史
             clearSessionButton.addEventListener('click', async () => {
                 if (!currentSessionId) {
                     addSystemMessage('没有活动会话，请先创建会话');
                     return;
                 }
-                
+
                 try {
                     const formData = new FormData();
                     formData.append('session_id', currentSessionId);
-                    
+
                     const response = await fetch(`${API_BASE_URL}/rag/contextual/session/clear`, {
                         method: 'POST',
                         body: formData
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok) {
                         addSystemMessage('会话历史已清除');
                     } else {
@@ -618,7 +849,7 @@
                     addSystemMessage(`清除会话历史出错: ${error.message}`);
                 }
             });
-            
+
             // 发送消息
             sendMessageButton.addEventListener('click', () => sendChatMessage());
             chatInput.addEventListener('keypress', event => {
@@ -626,7 +857,7 @@
                     sendChatMessage();
                 }
             });
-            
+
             // 添加用户消息
             function addUserMessage(text) {
                 const messageDiv = document.createElement('div');
@@ -635,7 +866,7 @@
                 chatMessages.appendChild(messageDiv);
                 scrollToBottom();
             }
-            
+
             // 添加系统消息
             function addSystemMessage(text) {
                 const messageDiv = document.createElement('div');
@@ -645,7 +876,7 @@
                 scrollToBottom();
                 return messageDiv.id;
             }
-            
+
             // 添加系统正在思考的消息
             function addSystemThinkingMessage() {
                 const messageDiv = document.createElement('div');
@@ -657,7 +888,7 @@
                 scrollToBottom();
                 return id;
             }
-            
+
             // 移除消息
             function removeMessage(id) {
                 if (!id) return;
@@ -666,16 +897,16 @@
                     messageDiv.remove();
                 }
             }
-            
+
             // 给消息添加引用
             function addCitationToLastMessage(result) {
                 const sources = result.sources || [];
                 if (!sources || sources.length === 0) {
                     return;
                 }
-                
+
                 let citationHtml = '<div class="mt-2 text-xs text-gray-500"><details><summary>查看引用来源</summary><div class="mt-2 space-y-2">';
-                
+
                 sources.forEach((source, index) => {
                     if (typeof source === 'object') {
                         const title = source.filename || source.title || `来源 ${index + 1}`;
@@ -683,11 +914,21 @@
                         const content = source.content || source.page_content || source.text || '';
                         const score = source.score !== undefined ? `(相关度分数: ${source.score.toFixed(4)})` : '';
                         const sourcePath = source.source ? `<div class="text-xs opacity-50 mt-1">${source.source.split('/').pop()}</div>` : '';
-                        
+                        const isEvent = source.is_event || false;
+                        const eventType = source.event_type || '';
+
+                        let typeTag = '';
+                        if (isEvent) {
+                            typeTag = `<span class="event-tag event-${eventType.split('_')[0] || 'other'} text-xs">${getEventTypeName(eventType)}</span>`;
+                        }
+
                         citationHtml += `
                             <div class="p-2 bg-gray-100 rounded">
-                                <div class="flex justify-between">
-                                    <span class="font-medium">${escapeHtml(title)} ${score}</span>
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="font-medium">${escapeHtml(title)} ${score}</span>
+                                        ${typeTag}
+                                    </div>
                                     ${pageInfo ? `<span>页码: ${pageInfo}</span>` : ''}
                                 </div>
                                 ${content ? `<p class="text-xs mt-1">${escapeHtml(content.substring(0, 150))}${content.length > 150 ? '...' : ''}</p>` : ''}
@@ -696,34 +937,34 @@
                         `;
                     }
                 });
-                
+
                 citationHtml += '</div></details></div>';
-                
+
                 const messages = document.querySelectorAll('#chat-messages .system-message');
                 if (messages.length > 0) {
                     const lastMessage = messages[messages.length - 1];
                     lastMessage.innerHTML += citationHtml;
                 }
             }
-            
+
             // 滚动到底部
             function scrollToBottom() {
                 const chatContainer = document.getElementById('chat-container');
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
-            
+
             // 发送聊天消息函数
             async function sendChatMessage() {
                 const message = chatInput.value.trim();
                 if (!message) return;
-                
+
                 // 添加用户消息到聊天窗口
                 addUserMessage(message);
                 chatInput.value = '';
-                
+
                 // 添加系统正在思考的消息
                 const thinkingMsgId = addSystemThinkingMessage();
-                
+
                 // 准备表单数据
                 const formData = new FormData();
                 formData.append('query', message);
@@ -734,69 +975,34 @@
                 formData.append('use_decomposition', ctxDecomposition.checked);
                 formData.append('use_reranking', ctxReranking.checked);
                 formData.append('use_citation', ctxCitation.checked);
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/rag/contextual/query`, {
                         method: 'POST',
                         body: formData
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     // 移除正在思考的消息
                     removeMessage(thinkingMsgId);
-                    
+
                     if (response.ok) {
-                        // 适配新的响应结构
                         const ragResult = result.result || result;
-                        
+
                         // 如果是新会话，保存会话ID
                         if (ragResult.session_id && !currentSessionId) {
                             currentSessionId = ragResult.session_id;
                             sessionIdSpan.textContent = currentSessionId;
                         }
-                        
+
                         // 添加系统回复消息
                         const answer = ragResult.answer || ragResult.response || "";
                         addSystemMessage(answer);
-                        
+
                         // 如果启用了引用，在消息下方添加引用源
                         if (ctxCitation.checked && ragResult.sources && ragResult.sources.length > 0) {
                             addCitationToLastMessage(ragResult);
-                        }
-                        
-                        // 展示处理信息（如果有debug参数）
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const isDebugMode = urlParams.has('debug');
-                        
-                        if (isDebugMode) {
-                            console.log('处理信息:', ragResult);
-                            
-                            const devInfoDiv = document.createElement('div');
-                            devInfoDiv.className = 'dev-info text-xs text-gray-400 mt-1';
-                            
-                            const processingInfo = ragResult.processing_info || {};
-                            const processingTime = ragResult.processing_time || ragResult.elapsed_time;
-                            
-                            devInfoDiv.innerHTML = `
-                                <details>
-                                    <summary>处理信息 (调试模式)</summary>
-                                    <div class="mt-1">
-                                        <strong>处理时间:</strong> ${typeof processingTime === 'number' ? processingTime.toFixed(2) : 'N/A'}秒
-                                    </div>
-                                    ${Object.keys(processingInfo).length > 0 ? 
-                                      `<details class="mt-1">
-                                          <summary>完整处理信息</summary>
-                                          <pre class="text-xs overflow-auto max-h-40">${JSON.stringify(processingInfo, null, 2)}</pre>
-                                      </details>` : ''}
-                                </details>
-                            `;
-                            
-                            const messages = document.querySelectorAll('#chat-messages .system-message');
-                            if (messages.length > 0) {
-                                const lastMessage = messages[messages.length - 1];
-                                lastMessage.appendChild(devInfoDiv);
-                            }
                         }
                     } else {
                         addSystemMessage(`查询失败: ${result.detail || result.error || result.message || '未知错误'}`);
@@ -808,15 +1014,109 @@
             }
         }
 
+        // 初始化统计信息功能
+        function initStatistics() {
+            const refreshStatsButton = document.getElementById('btn-refresh-stats');
+            const statisticsContent = document.getElementById('statistics-content');
+
+            refreshStatsButton.addEventListener('click', () => {
+                loadStatistics();
+            });
+
+            // 页面加载时自动加载统计信息
+            loadStatistics();
+
+            async function loadStatistics() {
+                statisticsContent.innerHTML = '<div class="col-span-full text-center text-gray-500">正在加载统计信息...</div>';
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/documents/statistics`);
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        displayStatistics(result);
+                    } else {
+                        statisticsContent.innerHTML = '<div class="col-span-full text-center text-red-500">加载统计信息失败</div>';
+                    }
+                } catch (error) {
+                    statisticsContent.innerHTML = `<div class="col-span-full text-center text-red-500">加载统计信息出错: ${error.message}</div>`;
+                }
+            }
+
+            function displayStatistics(data) {
+                const detailedStats = data.detailed_statistics || {};
+                const breakdown = detailedStats.detailed_breakdown || {};
+                const distribution = detailedStats.distribution_percentages || {};
+
+                let html = `
+                    <!-- 总体统计 -->
+                    <div class="bg-blue-50 p-6 rounded-lg">
+                        <h3 class="font-bold text-blue-800 mb-4 text-lg">📊 总体统计</h3>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <span>总文档块数:</span>
+                                <span class="font-bold text-xl">${detailedStats.total_documents || 0}</span>
+                            </div>
+
+                            <div class="flex justify-between">
+                                <span>文档文件块:</span>
+                                <span class="font-medium">${(detailedStats.total_documents || 0) - (detailedStats.chat_files || 0)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 详细分类 -->
+                    <div class="bg-green-50 p-6 rounded-lg">
+                        <h3 class="font-bold text-green-800 mb-4 text-lg">🔍 详细分类</h3>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <span>事件块:</span>
+                                <span class="font-bold text-purple-600">${breakdown.only_events || 0}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>命题块:</span>
+                                <span class="font-bold text-green-600">${breakdown.only_propositions || 0}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>普通块:</span>
+                                <span class="font-bold text-blue-600">${breakdown.only_regular || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 存储信息 -->
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="font-bold text-gray-800 mb-4 text-lg">💾 存储信息</h3>
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <div class="font-medium text-gray-700">索引名称:</div>
+                                <div class="text-xs break-all bg-white p-2 rounded mt-1">${data.search_statistics?.index_name || '未知'}</div>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-700">向量存储:</div>
+                                <div class="text-xs bg-white p-2 rounded mt-1">${data.search_statistics?.vector_store_type || 'elasticsearch'}</div>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-700">文档目录:</div>
+                                <div class="text-xs break-all bg-white p-2 rounded mt-1">${data.documents_directory || '未知'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                statisticsContent.innerHTML = html;
+            }
+        }
+
         // 检查系统状态
         async function checkSystemStatus() {
             const statusIndicator = document.getElementById('system-status');
             const statusText = document.getElementById('status-text');
-            
+
             try {
                 const response = await fetch(`http://127.0.0.1:8000/health`);
                 const result = await response.json();
-                
+
                 if (response.ok && result.status === 'healthy') {
                     statusIndicator.className = 'inline-block h-3 w-3 rounded-full bg-green-500 mr-2';
                     statusText.textContent = '在线';
@@ -829,6 +1129,32 @@
                 statusText.textContent = '离线';
                 console.error('系统状态检查失败:', error);
             }
+        }
+
+        // 辅助函数
+        function getEventTypeName(type) {
+            const typeNames = {
+                'meeting_plan': '会议计划',
+                'meal_plan': '用餐计划',
+                'travel_plan': '出行计划',
+                'shopping_plan': '购物计划',
+                'entertainment_plan': '娱乐计划',
+                'family_plan': '家庭计划',
+                'work_task': '工作任务',
+                'social_event': '社交活动',
+                'other_plan': '其他计划'
+            };
+            return typeNames[type] || type || '未知类型';
+        }
+
+        function getRetrievalTypeName(type) {
+            const typeNames = {
+                'intelligent': '智能检索',
+                'hybrid': '混合检索',
+                'semantic': '语义检索',
+                'keyword': '关键词检索'
+            };
+            return typeNames[type] || type || '未知策略';
         }
 
         // HTML转义函数，防止XSS

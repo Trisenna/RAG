@@ -7,7 +7,7 @@ import os
 import asyncio
 import logging
 from typing import Dict, Any, Optional
-import  time
+import time
 from core.config.settings import settings
 from core.exceptions.errors import IndexingException, DocumentProcessingException
 from components.document.loaders import DocumentLoader
@@ -278,13 +278,19 @@ class IndexingService:
         return file_paths
 
     def _add_file_metadata(self, documents: list, file_path: str) -> list:
-        """为文档添加文件级别的元数据"""
+        """为文档添加文件级别的元数据 - 修复版本"""
+        # 生成唯一的document_id
+        document_id = file_path
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+
         file_metadata = {
             "source": file_path,
             "filename": os.path.basename(file_path),
             "file_size": os.path.getsize(file_path),
             "file_type": os.path.splitext(file_path)[1].lower(),
-            "indexed_at": int(time.time())
+            "indexed_at": int(time.time()),
+            "document_id": document_id,  # 确保添加document_id
+            "base_name": base_name       # 添加基础名称用于生成chunk_id
         }
 
         # 为每个文档添加文件元数据
@@ -293,6 +299,9 @@ class IndexingService:
                 doc.metadata = {}
             doc.metadata.update(file_metadata)
 
+            # 确保document_id在元数据中
+            logger.debug(f"添加文件元数据到文档: document_id={document_id}, filename={file_metadata['filename']}")
+
         return documents
 
     def _generate_file_stats(self, file_path: str, original_docs: list, split_docs: list) -> Dict[str, Any]:
@@ -300,9 +309,15 @@ class IndexingService:
         original_stats = self.preprocessor.extract_text_statistics(original_docs)
         split_stats = self.preprocessor.extract_text_statistics(split_docs)
 
-        # 统计命题数量
+        # 统计不同类型的块
+        event_count = sum(1 for doc in split_docs
+                         if doc.metadata and doc.metadata.get("is_event", False))
         proposition_count = sum(1 for doc in split_docs
                               if doc.metadata and doc.metadata.get("is_proposition", False))
+        chat_count = sum(1 for doc in split_docs
+                        if doc.metadata and doc.metadata.get("is_chat_file", False))
+        backup_count = sum(1 for doc in split_docs
+                          if doc.metadata and doc.metadata.get("is_backup_chunk", False))
 
         return {
             "file_info": {
@@ -317,8 +332,11 @@ class IndexingService:
             },
             "processed_documents": {
                 "total_chunks": split_stats["total_documents"],
+                "event_chunks": event_count,
                 "proposition_chunks": proposition_count,
-                "regular_chunks": split_stats["total_documents"] - proposition_count,
+                "chat_chunks": chat_count,
+                "backup_chunks": backup_count,
+                "regular_chunks": split_stats["total_documents"] - event_count - proposition_count,
                 "total_characters": split_stats["total_characters"],
                 "average_chunk_length": split_stats["average_length"]
             }
@@ -348,5 +366,3 @@ class IndexingService:
             error_msg = f"重新创建索引失败: {str(e)}"
             logger.error(error_msg)
             raise IndexingException(error_msg, error_code="RECREATE_INDEX_ERROR")
-
-
